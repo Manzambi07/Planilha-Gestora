@@ -1,0 +1,184 @@
+.header {
+
+    width: 100%;
+    box-sizing: border-box;
+    padding: 24px 30px 0 30px;
+    background-color: #080808;
+    border-bottom: 1px solid #1f1f1f;
+}
+
+.header > nav {
+
+    width: 100%;
+}
+
+.lista {
+
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+}
+
+.lista > li {
+
+    list-style: none;
+    display: flex;
+}
+
+.link {
+
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    color: #a6a6a6;
+    font-family: 'century gothic';
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease;
+}
+.link1{
+     position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    color: #a6a6a6;
+    font-family: 'century gothic';
+    font-size: 15px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color 0.2s ease, background-color 0.2s ease;
+
+}
+.link:hover {
+
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* linha verde: aparece no hover e fica quando o link está ativo */
+.link::after {
+
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    height: 3px;
+    background: #2acd2d;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.25s ease;
+}
+
+.link:hover::after,
+.ativo::after {
+
+    transform: scaleX(1);
+}
+
+.ativo {
+
+    color: #ffffff;
+}
+
+.ativo svg {
+
+    color: #2acd2d;
+}
+
+@media (max-width: 600px) {
+
+    .header {
+
+        padding: 12px 12px 0 12px;
+    }
+
+    .link {
+
+        padding: 12px 12px;
+        font-size: 14px;
+    }
+}
+
+/* ---- barra com os links à esquerda e o utilizador à direita ---- */
+.barra {
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.utilizador {
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 6px;
+    flex-shrink: 0;
+}
+
+.utilizadorTexto {
+
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    line-height: 1.25;
+    font-family: 'century gothic';
+}
+
+.utilizadorNome {
+
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.utilizadorPerfil {
+
+    color: #a6a6a6;
+    font-size: 12px;
+}
+
+.sair {
+
+    display: inline-flex;
+    padding: 8px;
+    border: 1px solid #2a2a2a;
+    background: transparent;
+    color: #a6a6a6;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.sair:hover {
+
+    color: #ffffff;
+    border-color: #2acd2d;
+}
+
+.sair:focus-visible {
+
+    outline: 2px solid #2acd2d;
+    outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+
+    .utilizadorTexto {
+
+        display: none;
+    }
+}

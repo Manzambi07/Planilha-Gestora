@@ -1,0 +1,349 @@
+* {
+  box-sizing: border-box;
+}
+
+.pageWrapper {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #080909;
+  padding: 20px;
+  font-family: 'century gothic', sans-serif;
+}
+
+.loginWrapper {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.form {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.container {
+  width: 100%;
+  border-radius: 24px;
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 28px;
+  padding: 40px 32px;
+  background-color: #0e1010;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Cabeçalho do Card */
+.headerLogin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.badgeIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background-color: rgba(5, 207, 22, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  border: 1px solid rgba(5, 207, 22, 0.2);
+}
+
+.headerLogin h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+}
+
+.headerLogin p {
+  font-size: 13px;
+  color: #8c929a;
+  margin: 0;
+}
+
+/* Inputs */
+.inputes {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.inputGroup {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inputGroup label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c5c9d1;
+}
+
+.inputWrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.iconField {
+  position: absolute;
+  left: 16px;
+  color: #05cf16;
+  pointer-events: none;
+}
+
+.inputWrapper input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px 0 46px;
+  font-family: 'century gothic', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  outline: none;
+  border-radius: 14px;
+  color: white;
+  background-color: #16191a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.inputWrapper input::placeholder {
+  color: #5a6069;
+}
+
+.inputWrapper input:focus {
+  border-color: #05cf16;
+  background-color: #121516;
+  box-shadow: 0 0 0 3px rgba(5, 207, 22, 0.15);
+}
+
+/* Mensagem de Erro */
+.erroContainer {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 12px;
+}
+
+.erroContainer span {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e74c3c;
+  display: block;
+  text-align: center;
+}
+
+/* Botão de Entrar */
+.btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.btn > button {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  outline: none;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: 'century gothic', sans-serif;
+  cursor: pointer;
+  color: white;
+  background: #05cf16;
+  border: none;
+  box-shadow: 0 4px 14px rgba(5, 207, 22, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn > button:hover:not(:disabled) {
+  background: #04b813;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(5, 207, 22, 0.4);
+}
+
+.btn > button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn > button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* Rodapé */
+.footer {
+  width: 100%;
+  text-align: center;
+  padding-top: 4px;
+}
+
+.footer p {
+  font-family: 'century gothic', sans-serif;
+  font-size: 12px;
+  color: #6c757d;
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+
+/* Tabela e Estruturas Gerais */
+.conteudo {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.conteudo > main {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 0;
+}
+
+.tabelaWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  overflow: auto;
+  border-radius: 0;
+  border: 2px solid #0d0d0e;
+  background-color: rgb(249, 251, 255);
+}
+
+.table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+  background-color: rgb(249, 251, 255);
+}
+
+.table thead tr th {
+  font-family: 'century gothic', sans-serif;
+  background-color: #ffffff;
+  color: #100f0f;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f4f4f7;
+  height: 60px;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.table tbody tr td {
+  font-family: 'century gothic', sans-serif;
+  text-align: left;
+  font-size: 15px;
+  padding: 12px 20px;
+  color: #0e0e0f;
+  border-bottom: 1px solid rgb(218, 218, 218);
+  height: 64px;
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.table tbody tr:nth-child(even) {
+  background-color: rgb(238, 241, 247);
+}
+
+.table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.table tbody tr:hover {
+  background-color: rgba(13, 13, 14, 0.08);
+}
+
+.table tbody tr td .nomeCelula {
+  display: flex;
+  align-items: center;
+  color: #0e0e0f;
+}
+
+.table tbody tr td .quantidade {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #0e0e0f;
+  line-height: 1;
+}
+
+.table tbody tr td .acoes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  height: auto;
+}
+
+.icon {
+  display: block;
+}
+
+.iconBtn {
+  display: inline-flex;
+  padding: 8px;
+  margin: 0;
+  line-height: 0;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: black;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.iconBtn:hover {
+  background-color: rgb(236, 238, 243);
+  border-color: #0d0d0e;
+}
+
+.vazio {
+  text-align: center !important;
+  color: dimgray !important;
+  padding: 48px 20px !important;
+  font-weight: 500 !important;
+}
+
+.linkBtn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #0d0d0e;
+  font-family: 'century gothic', sans-serif;
+  font-size: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
