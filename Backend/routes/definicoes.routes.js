@@ -270,4 +270,20 @@ router.get('/atividade', soAdmin, async (req, res) => {
   }
 })
 
+// DELETE /api/definicoes/atividade?dias=90  -> apaga registos com mais de N dias (mínimo 30).
+// Nunca apaga os registos de documentos fiscais (tabela "faturas"). A própria limpeza fica registada.
+router.delete('/atividade', soAdmin, async (req, res) => {
+  try {
+    const dias = numero(req.query.dias, 'Dias', { min: 30, max: 3650, inteiro: true })
+    const limite = new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+    const apagados = await Auditoria.destroy({
+      where: { criado_em: { [Op.lt]: limite }, tabela: { [Op.ne]: 'faturas' } },
+    })
+    await registar(req, 'limpar_atividade', 'sistema', null, { maisAntigosQue: `${dias} dias`, apagados })
+    res.json({ apagados })
+  } catch (erro) {
+    tratarErro(res, erro, 'Erro ao limpar o registo de atividade.')
+  }
+})
+
 module.exports = router

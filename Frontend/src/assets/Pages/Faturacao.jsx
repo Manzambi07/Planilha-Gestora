@@ -3,10 +3,12 @@ import estilo from './Faturacao.module.css'
 import painel from './Painel.module.css'
 import Venda from './Venda'
 import Documentos from './Documentos'
+import Fecho from './Fecho'
 
 const ABAS = [
   { id: 'venda', rotulo: 'Nova venda' },
   { id: 'documentos', rotulo: 'Documentos' },
+  { id: 'fecho', rotulo: 'Fecho do dia' },
 ]
 
 export default function Faturacao() {
@@ -37,6 +39,9 @@ export default function Faturacao() {
       </div>
       <div id="fat-painel-documentos" role="tabpanel" aria-labelledby="fat-aba-documentos" hidden={aba !== 'documentos'}>
         <Documentos ativo={aba === 'documentos'} />
+      </div>
+      <div id="fat-painel-fecho" role="tabpanel" aria-labelledby="fat-aba-fecho" hidden={aba !== 'fecho'}>
+        <Fecho ativo={aba === 'fecho'} />
       </div>
     </div>
   )

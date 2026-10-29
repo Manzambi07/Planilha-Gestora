@@ -146,6 +146,7 @@ export default function Documentos({ ativo }) {
       {aberto && (
         <Documento
           doc={aberto.doc}
+          segundaVia
           podeAnular={podeAnular}
           aoFechar={() => setAberto(null)}
           aoAtualizar={(doc) => { setAberto({ doc }); setTentativa((t) => t + 1) }}

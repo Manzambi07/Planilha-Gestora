@@ -9,13 +9,15 @@ import {
   Trash,
   Search,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  QrCode
 } from 'lucide-react'
 import Modal from './Modal'
 import modal from './Modal.module.css'
 import ModalProduto from './ModalProduto'
 import ModalCategoria from './ModalCategoria'
 import ModalFornecedor from './ModalFornecedor'
+import EtiquetasQR from './EtiquetasQR'
 import { pedir } from './api'
 
 // tira acentos e maiúsculas para a pesquisa ("jose" encontra "José")
@@ -77,6 +79,7 @@ export default function Pagina() {
   const [modalProduto, setModalProduto] = useState(null) // { id: null } = novo | { id: 3 } = editar
   const [modalCategoria, setModalCategoria] = useState(false)
   const [modalFornecedor, setModalFornecedor] = useState(false)
+  const [etiquetas, setEtiquetas] = useState(null) // produtos para imprimir etiquetas com QR Code
 
   // confirmação de eliminar produto
   const [produtoApagar, setProdutoApagar] = useState(null)
@@ -170,6 +173,9 @@ export default function Pagina() {
                 </button>
                 <button type="button" className={barra.botao} title="Imprimir" onClick={() => window.print()}>
                   <Printer color='black' size={18} /> Imprimir
+                </button>
+                <button type="button" className={barra.botao} title="Imprimir etiquetas com QR Code" onClick={() => setEtiquetas(filtrados)}>
+                  <QrCode color='black' size={18} /> Etiquetas QR
                 </button>
                 <button
                   type="button"
@@ -318,6 +324,16 @@ export default function Pagina() {
 
                       <button
                         type="button"
+                        className={style.iconBtn}
+                        aria-label={`Imprimir etiqueta QR de ${u.nome}`}
+                        title="Imprimir etiqueta QR"
+                        onClick={() => setEtiquetas([u])}
+                      >
+                        <QrCode size={18} className={style.icon} color="#2acd2d" />
+                      </button>
+
+                      <button
+                        type="button"
                         className={`${style.iconBtn} ${style.editar}`}
                         aria-label={`Editar ${u.nome}`}
                         title="Editar"
@@ -369,6 +385,8 @@ export default function Pagina() {
         aoFechar={() => setModalFornecedor(false)}
         aoAlterar={recarregar}
       />
+
+      {etiquetas && <EtiquetasQR produtos={etiquetas} aoFechar={() => setEtiquetas(null)} />}
 
       <Modal
         aberto={!!produtoApagar}

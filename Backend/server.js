@@ -32,6 +32,9 @@ App.use('/api/fornecedores', ...gestao, require('./routes/fornecedores.routes'))
 // ---- faturação: vender, emitir e consultar documentos (todos os perfis; anular e verificar são restritos dentro do ficheiro)
 App.use('/api/faturacao', exigirLogin, require('./routes/faturacao.routes'))
 
+// ---- cópias de segurança (só admin)
+App.use('/api/backup', exigirLogin, exigirPerfil('admin'), require('./routes/backup.routes'))
+
 // ---- só admin
 App.use('/api/utilizadores', exigirLogin, exigirPerfil('admin'), require('./routes/utilizadores.routes'))
 
@@ -53,4 +56,5 @@ App.use((erro, req, res, next) => {
 
 App.listen(PORT, () => {
   console.log(`servidor rodando na porta:${PORT}`)
+  if (require('./services/backup').agendarAutomatico()) console.log('cópia de segurança automática ligada')
 })

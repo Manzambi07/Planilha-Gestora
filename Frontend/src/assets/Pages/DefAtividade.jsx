@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import style from './Login.module.css'
 import estilo from './Painel.module.css'
+import Modal from './Modal'
 import modal from './Modal.module.css'
 import { pedir } from './api'
 import { dataHora } from './formatar'
@@ -16,6 +17,14 @@ const ACOES = {
   redefinir_senha: 'Redefiniu a senha',
   alterar_senha: 'Alterou a senha',
   login: 'Iniciou sessão',
+  emitir: 'Emitiu documento',
+  anular: 'Anulou documento',
+  receber_pagamento: 'Recebeu pagamento',
+  backup: 'Criou cópia de segurança',
+  descarregar_backup: 'Descarregou cópia de segurança',
+  apagar_backup: 'Eliminou cópia de segurança',
+  limpar_atividade: 'Limpou registos antigos',
+  limpar_testes: 'Eliminou documentos de teste',
 }
 
 const TABELAS = {
@@ -23,6 +32,9 @@ const TABELAS = {
   empresa: 'Empresa',
   taxas_iva: 'Taxas de IVA',
   metodos_pagamento: 'Métodos de pagamento',
+  faturas: 'Faturas',
+  clientes: 'Clientes',
+  sistema: 'Sistema',
 }
 
 // Resume o JSON guardado na auditoria numa linha legível
@@ -50,6 +62,27 @@ export default function DefAtividade() {
   const [dados, setDados] = useState({ total: 0, registos: [] })
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState('')
+  const [limpar, setLimpar] = useState(false)
+  const [diasLimpeza, setDiasLimpeza] = useState(90)
+  const [aLimpar, setALimpar] = useState(false)
+  const [resultado, setResultado] = useState('')
+
+  const executarLimpeza = async () => {
+    setALimpar(true)
+    setErro('')
+    try {
+      const d = await pedir(`/api/definicoes/atividade?dias=${diasLimpeza}`, { method: 'DELETE' })
+      setResultado(d.apagados === 1 ? '1 registo eliminado.' : `${d.apagados} registos eliminados.`)
+      setLimpar(false)
+      setPagina(1)
+      setTentativa((t) => t + 1)
+    } catch (e) {
+      setErro(e.message)
+      setLimpar(false)
+    } finally {
+      setALimpar(false)
+    }
+  }
 
   useEffect(() => {
     const controlador = new AbortController()
@@ -89,7 +122,11 @@ export default function DefAtividade() {
             <option value="">Todas as áreas</option>
             {Object.entries(TABELAS).map(([v, r]) => <option key={v} value={v}>{r}</option>)}
           </select>
+          <button type="button" className={`${modal.btn} ${modal.btnPequeno}`} onClick={() => { setResultado(''); setLimpar(true) }}>
+            Limpar registos antigos
+          </button>
         </div>
+        {resultado && <div className={estilo.ok} role="status" style={{ marginTop: 12 }}>{resultado}</div>}
       </div>
 
       <div className={style.tabelaWrap} style={{ maxHeight: 'none' }}>
@@ -147,6 +184,30 @@ export default function DefAtividade() {
           </div>
         </div>
       )}
+
+      <Modal aberto={limpar} titulo="Limpar registos antigos" aoFechar={() => setLimpar(false)} estreita>
+        <div className={modal.corpo}>
+          <p className={modal.texto}>
+            Apaga os registos de atividade mais antigos que o período escolhido. Os registos dos documentos de faturação
+            nunca são apagados, e esta limpeza fica registada.
+          </p>
+          <div className={modal.campo} style={{ marginTop: 12 }}>
+            <label htmlFor="dias-limpeza">Apagar registos com mais de</label>
+            <select id="dias-limpeza" value={diasLimpeza} onChange={(e) => setDiasLimpeza(Number(e.target.value))}>
+              <option value={30}>30 dias</option>
+              <option value={90}>90 dias</option>
+              <option value={180}>6 meses</option>
+              <option value={365}>1 ano</option>
+            </select>
+          </div>
+        </div>
+        <div className={modal.rodape}>
+          <button type="button" className={modal.btn} onClick={() => setLimpar(false)}>Cancelar</button>
+          <button type="button" className={`${modal.btn} ${modal.btnPerigo}`} disabled={aLimpar} onClick={executarLimpeza}>
+            {aLimpar ? 'A limpar...' : 'Limpar'}
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }

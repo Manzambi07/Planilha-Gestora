@@ -1,7 +1,7 @@
 // Faturação: emitir, receber, anular e verificar documentos.
 // Cada operação corre numa TRANSAÇÃO: ou fica tudo gravado (documento, itens, pagamentos,
 // stock e número da série) ou não fica nada.
-const { Op, fn, col } = require('sequelize')
+const { Op, fn, col, QueryTypes } = require('sequelize')
 const {
   sequelize, Empresa, Cliente, Produto, TaxaIva, SerieDocumento, MetodoPagamento,
   Fatura, FaturaItem, Pagamento, MovimentoStock, Utilizador,
@@ -114,7 +114,7 @@ async function pesquisarProdutos(busca, baseUrl) {
   const produtos = await Produto.findAll({
     where: {
       ativo: true,
-      [Op.or]: [{ nome: { [Op.like]: termo } }, { codigo: { [Op.like]: termo } }, { codigo_barras: { [Op.like]: termo } }],
+      [Op.or]: [{ nome: { [Op.iLike]: termo } }, { codigo: { [Op.iLike]: termo } }, { codigo_barras: { [Op.iLike]: termo } }],
     },
     order: [['nome', 'ASC']],
     limit: 12,
@@ -144,7 +144,7 @@ const formatarCliente = (c) => ({
 async function listarClientes(busca) {
   const termo = `%${String(busca || '').trim().replace(/[%_\\]/g, '\\$&')}%`
   const clientes = await Cliente.findAll({
-    where: { ativo: true, [Op.or]: [{ nome: { [Op.like]: termo } }, { nif: { [Op.like]: termo } }] },
+    where: { ativo: true, [Op.or]: [{ nome: { [Op.iLike]: termo } }, { nif: { [Op.iLike]: termo } }] },
     order: [['nome', 'ASC']],
     limit: 15,
   })
@@ -441,9 +441,9 @@ async function listarDocumentos(filtros) {
   if (busca) {
     const termo = `%${busca.replace(/[%_\\]/g, '\\$&')}%`
     where[Op.or] = [
-      { numero_completo: { [Op.like]: termo } },
-      { '$cliente.nome$': { [Op.like]: termo } },
-      { '$cliente.nif$': { [Op.like]: termo } },
+      { numero_completo: { [Op.iLike]: termo } },
+      { '$cliente.nome$': { [Op.iLike]: termo } },
+      { '$cliente.nif$': { [Op.iLike]: termo } },
     ]
   }
 
@@ -585,8 +585,131 @@ async function verificarIntegridade() {
   return { ok: resultado.every((r) => r.ok), series: resultado }
 }
 
+// ---------------------------------------------------------------- eliminar documentos de TESTE
+/**
+ * Apaga TODOS os documentos emitidos e repõe o sistema como se nunca tivesse faturado:
+ * devolve o stock, apaga pagamentos, itens e documentos, volta as séries a 0.
+ * Só é possível enquanto o software NÃO tem número de validação da AGT (AGT_CERTIFICADO vazio).
+ * Depois da validação, um documento emitido nunca se apaga: anula-se com nota de crédito.
+ * (PostgreSQL: usa SET LOCAL para autorizar, só nesta transação, a remoção que os triggers bloqueiam.)
+ */
+async function limparDocumentosDeTeste() {
+  if (PROGRAMA.certificado) {
+    throw new ErroValidacao('Este software já tem número de validação da AGT: os documentos emitidos não podem ser eliminados. Para corrigir um documento, anule-o com nota de crédito.')
+  }
+
+  const t = await sequelize.transaction()
+  const q = (sql, opcoes = {}) => sequelize.query(sql, { transaction: t, ...opcoes })
+  try {
+    const [{ n }] = await q('SELECT COUNT(*)::int AS n FROM faturas', { type: QueryTypes.SELECT })
+    if (n === 0) {
+      await t.rollback()
+      return { documentos: 0 }
+    }
+
+    await q("SET LOCAL app.limpeza_teste = 'sim'")
+
+    // 1. o stock volta ao que era antes das vendas (soma dos movimentos ligados a documentos, com sinal trocado)
+    await q(`UPDATE produtos p SET stock_atual = p.stock_atual - m.liquido
+             FROM (SELECT produto_id, SUM(quantidade)::int AS liquido
+                   FROM movimentos_stock WHERE fatura_id IS NOT NULL GROUP BY produto_id) m
+             WHERE p.id = m.produto_id`)
+    await q('DELETE FROM movimentos_stock WHERE fatura_id IS NOT NULL')
+
+    // 2. documentos (as notas de crédito primeiro, porque apontam para os originais)
+    await q('DELETE FROM pagamentos')
+    await q('DELETE FROM fatura_itens')
+    await q("DELETE FROM faturas WHERE tipo = 'NC'")
+    await q('DELETE FROM faturas')
+
+    // 3. numeração e registos de atividade dos documentos recomeçam do zero
+    await q('UPDATE series_documentos SET ultimo_numero = 0')
+    await q("DELETE FROM auditoria WHERE tabela = 'faturas'")
+    for (const tabela of ['faturas', 'fatura_itens', 'pagamentos']) {
+      await q(`SELECT setval(pg_get_serial_sequence('${tabela}', 'id'), 1, false)`)
+    }
+
+    await t.commit()
+    return { documentos: n }
+  } catch (erro) {
+    await t.rollback()
+    if (/não podem ser (apagad|alterad)/i.test(erro.message)) {
+      throw new ErroValidacao('A base de dados bloqueou a eliminação. Execute novamente o ficheiro postgres_sequencias_e_triggers.sql (versão atualizada) e tente outra vez.')
+    }
+    throw erro
+  }
+}
+
+// ---------------------------------------------------------------- fecho do dia
+const hojeAngola = () => new Date(Date.now() + 3600 * 1000).toISOString().slice(0, 10)
+const euros = (v) => Math.round((Number(v) || 0) * 100) / 100
+
+/**
+ * Resumo de um dia: o que se vendeu, o que entrou em caixa por método e o que foi devolvido.
+ * O vendedor vê só o que ele próprio fez; administrador e gestor veem tudo (e por operador).
+ */
+async function fechoDoDia(dataTexto, utilizador) {
+  const data = /^\d{4}-\d{2}-\d{2}$/.test(dataTexto || '') ? dataTexto : hojeAngola()
+  const proprio = utilizador.perfil === 'vendedor'
+  const rep = { ini: `${data} 00:00:00`, fim: `${data} 23:59:59`, uid: utilizador.id }
+  const sel = (sql) => sequelize.query(sql, { replacements: rep, type: QueryTypes.SELECT })
+
+  const fDoc = proprio ? 'AND utilizador_id = :uid' : ''
+  const fNc = proprio ? 'AND nc.utilizador_id = :uid' : ''
+  const fPag = proprio ? 'AND p.utilizador_id = :uid' : ''
+
+  const [emitidos, [vendas], [notas], recebidos, [devolvido], operadores] = await Promise.all([
+    sel(`SELECT tipo, COUNT(*)::int AS quantidade, COALESCE(SUM(total), 0) AS total,
+                COALESCE(SUM(CASE WHEN estado = 'anulada' THEN 1 ELSE 0 END), 0)::int AS anuladas
+         FROM faturas WHERE data_emissao BETWEEN :ini AND :fim ${fDoc}
+         GROUP BY tipo ORDER BY tipo`),
+    sel(`SELECT COALESCE(SUM(total), 0) AS total FROM faturas
+         WHERE tipo IN ('FR','FT','ND') AND estado <> 'anulada'
+           AND data_emissao BETWEEN :ini AND :fim ${fDoc}`),
+    // nota de crédito de um documento já anulado não conta duas vezes
+    sel(`SELECT COALESCE(SUM(nc.total), 0) AS total FROM faturas nc
+         LEFT JOIN faturas o ON o.id = nc.fatura_origem_id
+         WHERE nc.tipo = 'NC' AND (o.id IS NULL OR o.estado <> 'anulada')
+           AND nc.data_emissao BETWEEN :ini AND :fim ${fNc}`),
+    sel(`SELECT m.nome AS metodo, COUNT(*)::int AS quantidade, COALESCE(SUM(p.valor), 0) AS total
+         FROM pagamentos p JOIN metodos_pagamento m ON m.id = p.metodo_id
+         WHERE p.data_pagamento BETWEEN :ini AND :fim ${fPag}
+         GROUP BY m.nome ORDER BY total DESC`),
+    // dinheiro devolvido: notas de crédito de faturas-recibo (já tinham sido pagas)
+    sel(`SELECT COALESCE(SUM(nc.total), 0) AS total FROM faturas nc
+         JOIN faturas o ON o.id = nc.fatura_origem_id
+         WHERE nc.tipo = 'NC' AND o.tipo = 'FR'
+           AND nc.data_emissao BETWEEN :ini AND :fim ${fNc}`),
+    proprio
+      ? Promise.resolve([])
+      : sel(`SELECT u.nome AS operador, COUNT(DISTINCT p.fatura_id)::int AS documentos, COALESCE(SUM(p.valor), 0) AS recebido
+             FROM pagamentos p JOIN utilizadores u ON u.id = p.utilizador_id
+             WHERE p.data_pagamento BETWEEN :ini AND :fim
+             GROUP BY u.nome ORDER BY recebido DESC`),
+  ])
+
+  const recebidoTotal = euros(recebidos.reduce((s, r) => s + Number(r.total), 0))
+  const devolvidoTotal = euros(devolvido.total)
+
+  return {
+    data,
+    ambito: proprio ? 'proprio' : 'todos',
+    emitidos: emitidos.map((e) => ({ tipo: e.tipo, tipoNome: NOMES_TIPO[e.tipo], quantidade: e.quantidade, total: euros(e.total), anuladas: e.anuladas })),
+    vendas: euros(vendas.total),
+    notasCredito: euros(notas.total),
+    vendasLiquidas: euros(euros(vendas.total) - euros(notas.total)),
+    recebidos: recebidos.map((r) => ({ metodo: r.metodo, quantidade: r.quantidade, total: euros(r.total) })),
+    recebidoTotal,
+    devolvido: devolvidoTotal,
+    emCaixa: euros(recebidoTotal - devolvidoTotal),
+    operadores: operadores.map((o) => ({ operador: o.operador, documentos: o.documentos, recebido: euros(o.recebido) })),
+  }
+}
+
+
 module.exports = {
   configuracao, produtoPorCodigo, pesquisarProdutos, listarClientes, formatarCliente,
   emitirDocumento, registarPagamento, anularDocumento, listarDocumentos, obterDocumento, verificarIntegridade,
+  limparDocumentosDeTeste, fechoDoDia,
   PERFIS_COM_DESCONTO,
 }

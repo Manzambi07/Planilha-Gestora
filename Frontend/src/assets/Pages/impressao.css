@@ -1,0 +1,10 @@
+/* Ao imprimir um documento, as etiquetas de QR Code ou o fecho do dia, só sai o conteúdo do
+   elemento "portal-impressao" (que só existe enquanto essa janela está aberta).
+   Nas outras páginas (listas, análise) o botão Imprimir continua a imprimir a página normal. */
+.portal-impressao { display: none; }
+
+@media print {
+  body:has(> .portal-impressao) > *:not(.portal-impressao) { display: none !important; }
+  body:has(> .portal-impressao) > .portal-impressao { display: block !important; }
+  body:has(> .portal-impressao) { background: #fff !important; overflow: visible !important; }
+}

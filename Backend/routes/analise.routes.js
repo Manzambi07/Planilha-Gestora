@@ -1,4 +1,4 @@
-// Só admin e gestor chegam aqui (a proteção está no server.js)
+// PostgreSQL. Só admin e gestor chegam aqui (a proteção está no server.js)
 const express = require('express')
 const { QueryTypes } = require('sequelize')
 const { sequelize, Utilizador } = require('../models')
@@ -51,16 +51,16 @@ router.get('/', async (req, res) => {
                COALESCE(SUM(stock_atual), 0) AS unidades,
                COALESCE(SUM(stock_atual * preco_custo), 0) AS custo,
                COALESCE(SUM(stock_atual * preco_venda), 0) AS venda,
-               COALESCE(SUM(stock_atual <= stock_minimo), 0) AS baixo,
-               COALESCE(SUM(stock_atual = 0), 0) AS sem_stock
-        FROM produtos WHERE ativo = 1`),
+               COALESCE(SUM(CASE WHEN stock_atual <= stock_minimo THEN 1 ELSE 0 END), 0) AS baixo,
+               COALESCE(SUM(CASE WHEN stock_atual = 0 THEN 1 ELSE 0 END), 0) AS sem_stock
+        FROM produtos WHERE ativo = true`),
 
       consultar(`
         SELECT c.nome, COUNT(p.id) AS produtos,
                COALESCE(SUM(p.stock_atual), 0) AS unidades,
                COALESCE(SUM(p.stock_atual * p.preco_venda), 0) AS valor
         FROM categorias c
-        JOIN produtos p ON p.categoria_id = c.id AND p.ativo = 1
+        JOIN produtos p ON p.categoria_id = c.id AND p.ativo = true
         GROUP BY c.id, c.nome
         ORDER BY valor DESC`),
 
@@ -68,12 +68,12 @@ router.get('/', async (req, res) => {
         SELECT p.id, p.nome, p.stock_atual AS quantidade, p.stock_minimo AS minimo, c.nome AS categoria
         FROM produtos p
         JOIN categorias c ON c.id = p.categoria_id
-        WHERE p.ativo = 1 AND p.stock_atual <= p.stock_minimo
+        WHERE p.ativo = true AND p.stock_atual <= p.stock_minimo
         ORDER BY p.stock_atual ASC, p.nome ASC
         LIMIT 8`),
 
       consultar(`
-        SELECT DATE_FORMAT(criado_em, '%Y-%m-%d') AS dia,
+        SELECT to_char(criado_em, 'YYYY-MM-DD') AS dia,
                COALESCE(SUM(CASE WHEN quantidade > 0 THEN quantidade ELSE 0 END), 0) AS entradas,
                COALESCE(SUM(CASE WHEN quantidade < 0 THEN -quantidade ELSE 0 END), 0) AS saidas
         FROM movimentos_stock
@@ -81,7 +81,7 @@ router.get('/', async (req, res) => {
         GROUP BY dia ORDER BY dia`, { desde }),
 
       consultar(`
-        SELECT DATE_FORMAT(data_emissao, '%Y-%m-%d') AS dia,
+        SELECT to_char(data_emissao, 'YYYY-MM-DD') AS dia,
                COUNT(*) AS documentos,
                COALESCE(SUM(CASE WHEN tipo = 'NC' THEN -total ELSE total END), 0) AS total
         FROM faturas

@@ -164,4 +164,27 @@ router.get('/integridade', exigirPerfil('admin'), async (req, res) => {
   }
 })
 
+// GET /api/faturacao/fecho?data=AAAA-MM-DD  -> resumo do dia (o vendedor vê só o seu)
+router.get('/fecho', async (req, res) => {
+  try {
+    res.json(await servico.fechoDoDia(req.query.data, req.utilizador))
+  } catch (erro) {
+    tratarErro(res, erro, 'Erro ao calcular o fecho do dia.')
+  }
+})
+
+// POST /api/faturacao/limpar-testes  { confirmacao: 'ELIMINAR TESTES' }  (só admin, e só antes da validação da AGT)
+router.post('/limpar-testes', exigirPerfil('admin'), async (req, res) => {
+  try {
+    if ((req.body || {}).confirmacao !== 'ELIMINAR TESTES') {
+      throw new ErroValidacao('Para confirmar, escreva exatamente: ELIMINAR TESTES')
+    }
+    const feito = await servico.limparDocumentosDeTeste()
+    await registar(req, 'limpar_testes', 'sistema', null, { documentos: feito.documentos })
+    res.json(feito)
+  } catch (erro) {
+    tratarErro(res, erro, 'Erro ao eliminar os documentos de teste.')
+  }
+})
+
 module.exports = router

@@ -1,0 +1,33 @@
+.opcoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.verificacao { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+
+.lista { list-style: none; margin: 0 0 14px; padding: 0; max-height: 200px; overflow-y: auto; border: 1px solid #e5e7eb; }
+.linha { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+.linha:last-child { border-bottom: none; }
+.linhaNome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.copias { width: 72px; padding: 6px; border: 1px solid #b5bac4; text-align: right; font: inherit; }
+.copias:focus { outline: 2px solid #2acd2d; }
+.aviso { margin: 0 0 12px; padding: 10px 12px; background: #fff3cd; border: 1px solid #e0b100; font-size: 13px; }
+
+.previa { background: #e5e7eb; padding: 14px; max-height: 280px; overflow-y: auto; }
+.grelha { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.etiqueta {
+  box-sizing: border-box;
+  padding: 2mm;
+  background: #fff;
+  border: 0.25mm dashed #999;
+  text-align: center;
+  color: #000;
+  font-family: Arial, Helvetica, sans-serif;
+  break-inside: avoid;
+}
+.qr { display: block; margin: 0 auto; object-fit: contain; image-rendering: pixelated; }
+.nome { margin-top: 1mm; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+.preco { margin-top: 0.5mm; font-weight: 700; }
+
+.folhaImpressao { display: flex; flex-wrap: wrap; gap: 1.5mm; align-items: flex-start; }
+
+@media print {
+  @page { margin: 8mm; }
+}

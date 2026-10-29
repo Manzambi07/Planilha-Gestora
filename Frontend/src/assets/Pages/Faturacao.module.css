@@ -527,15 +527,10 @@
   pointer-events: none;
 }
 
-/* impressão: só o documento sai no papel */
-.portalImpressao { display: none; }
-
+/* impressão: as regras gerais estão em impressao.css; aqui só o aspeto do documento no papel */
 @media print {
-  :global(body) > *:not(.portalImpressao) { display: none !important; }
-  .portalImpressao { display: block; }
   .portalImpressao .doc { max-width: none; padding: 0; }
   .portalImpressao .doc80 { max-width: 76mm; }
-  :global(body) { background: #fff !important; overflow: visible !important; }
 }
 
 /* ---------------------------------------------------------------- pequenos ecrãs */

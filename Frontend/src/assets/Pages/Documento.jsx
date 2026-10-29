@@ -4,6 +4,7 @@ import { Printer, Wallet, Ban } from 'lucide-react'
 import Modal from './Modal'
 import modal from './Modal.module.css'
 import estilo from './Faturacao.module.css'
+import './impressao.css'
 import { pedir } from './api'
 import { kz, n, dataHora } from './formatar'
 import { paraCentimos, deCentimos, resumoPorTaxa } from './calculos'
@@ -11,7 +12,7 @@ import { paraCentimos, deCentimos, resumoPorTaxa } from './calculos'
 const ESTADOS = { emitida: 'Emitida', paga: 'Paga', parcial: 'Parcialmente paga', anulada: 'Anulada' }
 
 // O documento tal como sai no ecrã e no papel
-function Folha({ doc, formato, troco }) {
+function Folha({ doc, formato, troco, segundaVia }) {
   const e = doc.empresa || {}
   const grupos = resumoPorTaxa(doc.itens.map((i) => ({
     ivaPercentagem: i.ivaPercentagem,
@@ -36,6 +37,7 @@ function Folha({ doc, formato, troco }) {
           <h3>{doc.tipoNome}</h3>
           <div className={estilo.docNumero}>{doc.numero}</div>
           <div>{dataHora(doc.dataEmissao)}</div>
+          {segundaVia && <div style={{ fontWeight: 700 }}>2.ª via</div>}
         </div>
       </div>
 
@@ -126,7 +128,7 @@ function Folha({ doc, formato, troco }) {
  * Janela com o documento + ações (imprimir, receber, anular).
  * aoAtualizar(doc): chamado depois de receber ou anular, com o documento já atualizado.
  */
-export default function Documento({ doc, troco = 0, podeAnular, aoFechar, aoAtualizar, aoNovaVenda }) {
+export default function Documento({ doc, troco = 0, segundaVia = false, podeAnular, aoFechar, aoAtualizar, aoNovaVenda }) {
   const [formato, setFormato] = useState('A4')
   const [acao, setAcao] = useState(null) // 'pagar' | 'anular' | null
   const [metodos, setMetodos] = useState([])
@@ -267,13 +269,13 @@ export default function Documento({ doc, troco = 0, podeAnular, aoFechar, aoAtua
       )}
 
       <div className={estilo.folha}>
-        <Folha doc={doc} formato={formato === '80' ? '80' : 'A4'} troco={trocoMostrado} />
+        <Folha doc={doc} formato={formato === '80' ? '80' : 'A4'} troco={trocoMostrado} segundaVia={segundaVia} />
       </div>
 
       {/* cópia só para o papel: ao imprimir, tudo o resto da página fica escondido */}
       {createPortal(
-        <div className={estilo.portalImpressao}>
-          <Folha doc={doc} formato={formato === '80' ? '80' : 'A4'} troco={trocoMostrado} />
+        <div className={`portal-impressao ${estilo.portalImpressao}`}>
+          <Folha doc={doc} formato={formato === '80' ? '80' : 'A4'} troco={trocoMostrado} segundaVia={segundaVia} />
         </div>,
         document.body,
       )}

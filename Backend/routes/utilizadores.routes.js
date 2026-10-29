@@ -62,7 +62,7 @@ router.get('/', async (req, res) => {
     if (req.query.estado === 'inativo') where.ativo = false
     if (busca) {
       const termo = `%${busca.replace(/[%_\\]/g, '\\$&')}%`
-      where[Op.or] = [{ nome: { [Op.like]: termo } }, { email: { [Op.like]: termo } }]
+      where[Op.or] = [{ nome: { [Op.iLike]: termo } }, { email: { [Op.iLike]: termo } }]
     }
 
     const [{ count, rows }, contagem] = await Promise.all([
