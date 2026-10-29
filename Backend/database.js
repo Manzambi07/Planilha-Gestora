@@ -1,8 +1,6 @@
 require('dotenv').config()
 const { Sequelize } = require('sequelize')
 
-// O PostgreSQL devolve os DECIMAL (preços, totais) como texto. Isto devolve números,
-// como o MySQL fazia com "decimalNumbers", para o resto do código continuar igual.
 Sequelize.postgres.DECIMAL.parse = (valor) => parseFloat(valor)
 
 const sequelize = new Sequelize(
@@ -13,7 +11,12 @@ const sequelize = new Sequelize(
         port: process.env.DB_PORT || 5432,
         dialect: 'postgres',
         logging: false,
-        timezone: '+01:00'
+        timezone: '+01:00',
+        dialectOptions: {
+            ssl: process.env.DB_SSL === 'true'
+                ? { require: true, rejectUnauthorized: false }
+                : false
+        }
     }
 )
 
