@@ -44,6 +44,12 @@ App.use('/api/definicoes', exigirLogin, require('./routes/definicoes.routes'))
 // ---- análise: admin e gestor
 App.use('/api/analise', exigirLogin, exigirPerfil('admin', 'gestor'), require('./routes/analise.routes'))
 
+// ---- SAF-T (AO): exportar o ficheiro de faturação (admin e gestor)
+App.use('/api/saft', exigirLogin, exigirPerfil('admin', 'gestor'), require('./routes/saft.routes'))
+
+// ---- fila de envio à AGT: estado e envio manual (só admin)
+App.use('/api/agt', exigirLogin, exigirPerfil('admin'), require('./routes/agt.routes'))
+
 App.use((req, res) => res.status(404).json({ erro: 'Rota não encontrada.' }))
 
 // eslint-disable-next-line no-unused-vars
@@ -57,4 +63,5 @@ App.use((erro, req, res, next) => {
 App.listen(PORT, () => {
   console.log(`servidor rodando na porta:${PORT}`)
   if (require('./services/backup').agendarAutomatico()) console.log('cópia de segurança automática ligada')
+  if (require('./services/agt').agendarEnvio()) console.log('envio automático de documentos para a AGT ligado')
 })
