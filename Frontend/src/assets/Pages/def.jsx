@@ -6,12 +6,14 @@ import DefListas from './DefListas'
 import DefConta from './DefConta'
 import DefAtividade from './DefAtividade'
 import DefBackup from './DefBackup'
+import DefAgt from './DefAgt'
 
 const ABAS = [
   { id: 'empresa', rotulo: 'Empresa' },
   { id: 'listas', rotulo: 'Impostos e pagamentos' },
   { id: 'conta', rotulo: 'A minha conta' },
   { id: 'atividade', rotulo: 'Atividade', soAdmin: true },
+  { id: 'agt', rotulo: 'AGT e SAF-T', soAdmin: true },
   { id: 'dados', rotulo: 'Cópias e dados', soAdmin: true },
 ]
 
@@ -46,6 +48,7 @@ export default function Definicoes() {
         {aba === 'listas' && <DefListas podeEditar={eAdmin} />}
         {aba === 'conta' && <DefConta />}
         {aba === 'atividade' && eAdmin && <DefAtividade />}
+        {aba === 'agt' && eAdmin && <DefAgt />}
         {aba === 'dados' && eAdmin && <DefBackup />}
       </div>
     </div>

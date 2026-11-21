@@ -8,6 +8,8 @@ const {
 } = require('../models')
 const { ErroValidacao } = require('../utils/validacao')
 const C = require('./calculos')
+const assinatura = require('./assinatura')
+const agt = require('./agt')
 
 // true  = o preço de venda dos produtos já inclui IVA (preço de prateleira)
 // false = o preço é sem IVA e o IVA soma-se
@@ -62,7 +64,7 @@ async function reservarNumero(tipo, dataEmissao, t) {
   const anterior = await Fatura.findOne({
     where: { serie_id: serie.id },
     order: [['numero', 'DESC']],
-    attributes: ['hash_documento'],
+    attributes: ['hash_documento', 'assinatura'],
     transaction: t,
   })
   await serie.update({ ultimo_numero: numero }, { transaction: t })
@@ -72,10 +74,37 @@ async function reservarNumero(tipo, dataEmissao, t) {
     numero,
     numeroCompleto: C.formatarNumero(tipo, ano, numero),
     hashAnterior: anterior ? anterior.hash_documento : '',
+    assinaturaAnterior: anterior ? anterior.assinatura || '' : '',
   }
 }
 
 const agora = () => new Date(Math.floor(Date.now() / 1000) * 1000) // sem milissegundos (o hash usa segundos)
+
+// Dados de segurança fiscal gravados em cada documento:
+//  - ligação ao documento anterior e assinatura digital (só se houver chave configurada);
+//  - cópia dos dados do emitente e do cliente no momento da emissão, para o documento impresso
+//    não mudar se a empresa ou o cliente forem editados depois;
+//  - o programa (e o número de validação) com que o documento foi produzido.
+function segurancaDoDocumento({ empresa, cliente, dataEmissao, numeroCompleto, totalCentimos, reserva }) {
+  const assin = assinatura.assinar(assinatura.textoParaAssinar({
+    dataEmissao, numeroCompleto, totalCentimos, assinaturaAnterior: reserva.assinaturaAnterior,
+  }))
+  return {
+    hash_anterior: reserva.hashAnterior || null,
+    assinatura: assin ? assin.assinatura : null,
+    chave_versao: assin ? assin.versao : null,
+    emitente_snapshot: {
+      nome: empresa.nome, nif: empresa.nif, endereco: empresa.endereco,
+      telefone: empresa.telefone, email: empresa.email, moeda: empresa.moeda,
+    },
+    cliente_snapshot: {
+      id: cliente.id, nome: cliente.nome, nif: cliente.nif,
+      endereco: cliente.endereco, telefone: cliente.telefone, email: cliente.email,
+    },
+    software_cert: PROGRAMA.certificado,
+    software_versao: `${PROGRAMA.nome} ${PROGRAMA.versao}`,
+  }
+}
 
 // ---------------------------------------------------------------- consultas para o ecrã de venda
 const formatarProdutoVenda = (p, taxa, baseUrl) => ({
@@ -232,6 +261,9 @@ async function emitirDocumento(dados, utilizador) {
     const hash = C.calcularHash({
       dataEmissao, numeroCompleto: reserva.numeroCompleto, totalCentimos: totais.total, hashAnterior: reserva.hashAnterior,
     })
+    const seguranca = segurancaDoDocumento({
+      empresa, cliente, dataEmissao, numeroCompleto: reserva.numeroCompleto, totalCentimos: totais.total, reserva,
+    })
 
     let vencimento = null
     if (tipo === 'FT') {
@@ -255,6 +287,7 @@ async function emitirDocumento(dados, utilizador) {
       total: C.deCentimos(totais.total),
       estado: tipo === 'FR' ? 'paga' : 'emitida',
       hash_documento: hash,
+      ...seguranca,
       observacoes: dados.observacoes || null,
     }, { transaction: t })
 
@@ -280,6 +313,9 @@ async function emitirDocumento(dados, utilizador) {
         utilizador_id: utilizador.id,
       })), { transaction: t })
     }
+
+    // ---- fila de envio à AGT (na mesma transação: se a emissão falhar, não fica nada na fila)
+    await agt.enfileirar(fatura.id, t)
 
     // ---- stock
     for (const l of linhas) {
@@ -377,6 +413,11 @@ async function anularDocumento(faturaId, motivoBruto, utilizador) {
     const hash = C.calcularHash({
       dataEmissao, numeroCompleto: reserva.numeroCompleto, totalCentimos: C.paraCentimos(original.total), hashAnterior: reserva.hashAnterior,
     })
+    const clienteOriginal = await Cliente.findByPk(original.cliente_id, { transaction: t })
+    const seguranca = segurancaDoDocumento({
+      empresa, cliente: clienteOriginal, dataEmissao, numeroCompleto: reserva.numeroCompleto,
+      totalCentimos: C.paraCentimos(original.total), reserva,
+    })
 
     const nota = await Fatura.create({
       serie_id: reserva.serieId,
@@ -394,6 +435,7 @@ async function anularDocumento(faturaId, motivoBruto, utilizador) {
       estado: 'emitida',
       motivo_anulacao: motivo,
       hash_documento: hash,
+      ...seguranca,
       observacoes: `Anulação de ${original.numero_completo}`,
     }, { transaction: t })
 
@@ -402,6 +444,8 @@ async function anularDocumento(faturaId, motivoBruto, utilizador) {
       preco_unitario: i.preco_unitario, desconto: i.desconto, iva_percentagem: i.iva_percentagem,
       iva_valor: i.iva_valor, total_linha: i.total_linha,
     })), { transaction: t })
+
+    await agt.enfileirar(nota.id, t)
 
     for (const i of itens) {
       const produto = porId.get(i.produto_id)
@@ -509,6 +553,13 @@ async function obterDocumento(id, baseUrl) {
     ? `${baseUrl}/${String(empresa.logotipo).replace(/\\/g, '/').replace(/^\/+/, '')}`
     : null
 
+  // Documentos emitidos mostram os dados que tinham NA EMISSÃO (cópia gravada no documento).
+  // Só os documentos antigos, sem cópia, usam os dados atuais da empresa e do cliente.
+  const emitente = f.emitente_snapshot
+    || (empresa ? { nome: empresa.nome, nif: empresa.nif, endereco: empresa.endereco, telefone: empresa.telefone, email: empresa.email, moeda: empresa.moeda } : null)
+  const clienteDoc = f.cliente_snapshot
+    || (f.cliente ? { id: f.cliente.id, nome: f.cliente.nome, nif: f.cliente.nif, endereco: f.cliente.endereco, telefone: f.cliente.telefone } : null)
+
   return {
     id: f.id,
     tipo: f.tipo,
@@ -517,8 +568,8 @@ async function obterDocumento(id, baseUrl) {
     estado: f.estado,
     dataEmissao: f.data_emissao,
     dataVencimento: f.data_vencimento,
-    cliente: f.cliente
-      ? { id: f.cliente.id, nome: f.cliente.nome, nif: f.cliente.nif, endereco: f.cliente.endereco, telefone: f.cliente.telefone }
+    cliente: clienteDoc
+      ? { id: clienteDoc.id, nome: clienteDoc.nome, nif: clienteDoc.nif, endereco: clienteDoc.endereco, telefone: clienteDoc.telefone }
       : null,
     emitidaPor: f.emitidaPor ? f.emitidaPor.nome : null,
     origem: f.faturaOrigem ? { id: f.faturaOrigem.id, numero: f.faturaOrigem.numero_completo } : null,
@@ -544,13 +595,14 @@ async function obterDocumento(id, baseUrl) {
     ivaTotal: num(f.iva_total),
     total: num(f.total),
     hash: f.hash_documento,
+    assinatura: f.assinatura || null,
     observacoes: f.observacoes,
     motivoAnulacao: f.motivo_anulacao,
     precosComIva: PRECOS_COM_IVA,
-    empresa: empresa
-      ? { nome: empresa.nome, nif: empresa.nif, endereco: empresa.endereco, telefone: empresa.telefone, email: empresa.email, moeda: empresa.moeda, logotipo: logo }
-      : null,
-    programa: PROGRAMA,
+    empresa: emitente ? { ...emitente, logotipo: logo } : null,
+    // o número de validação mostrado é o do momento da emissão: um documento emitido antes
+    // da validação do software nunca passa a dizer que foi produzido por programa validado
+    programa: { nome: PROGRAMA.nome, versao: PROGRAMA.versao, certificado: f.software_cert || null },
   }
 }
 
@@ -563,11 +615,12 @@ async function verificarIntegridade() {
   for (const serie of series) {
     const docs = await Fatura.findAll({
       where: { serie_id: serie.id },
-      attributes: ['numero', 'numero_completo', 'data_emissao', 'total', 'hash_documento'],
+      attributes: ['numero', 'numero_completo', 'data_emissao', 'total', 'hash_documento', 'hash_anterior', 'assinatura'],
       order: [['numero', 'ASC']],
     })
 
     let anterior = ''
+    let assinaturaAnterior = ''
     let esperado = 1
     let problema = null
     for (const d of docs) {
@@ -577,7 +630,23 @@ async function verificarIntegridade() {
         totalCentimos: C.paraCentimos(d.total), hashAnterior: anterior,
       })
       if (certo !== d.hash_documento) { problema = { numero: d.numero_completo, motivo: 'O hash não corresponde: o documento foi alterado.' }; break }
+      // a ligação ao anterior guardada no documento tem de bater com o documento anterior da série
+      if (d.hash_anterior != null && d.hash_anterior !== anterior) {
+        problema = { numero: d.numero_completo, motivo: 'A ligação ao documento anterior não corresponde.' }
+        break
+      }
+      if (d.assinatura && assinatura.ativo()) {
+        const texto = assinatura.textoParaAssinar({
+          dataEmissao: d.data_emissao, numeroCompleto: d.numero_completo,
+          totalCentimos: C.paraCentimos(d.total), assinaturaAnterior,
+        })
+        if (!assinatura.verificar(texto, d.assinatura)) {
+          problema = { numero: d.numero_completo, motivo: 'A assinatura digital não é válida.' }
+          break
+        }
+      }
       anterior = d.hash_documento
+      assinaturaAnterior = d.assinatura || ''
       esperado += 1
     }
     resultado.push({ serie: `${serie.tipo} ${serie.ano}`, documentos: docs.length, ok: !problema, problema })
@@ -587,57 +656,13 @@ async function verificarIntegridade() {
 
 // ---------------------------------------------------------------- eliminar documentos de TESTE
 /**
- * Apaga TODOS os documentos emitidos e repõe o sistema como se nunca tivesse faturado:
- * devolve o stock, apaga pagamentos, itens e documentos, volta as séries a 0.
- * Só é possível enquanto o software NÃO tem número de validação da AGT (AGT_CERTIFICADO vazio).
- * Depois da validação, um documento emitido nunca se apaga: anula-se com nota de crédito.
- * (PostgreSQL: usa SET LOCAL para autorizar, só nesta transação, a remoção que os triggers bloqueiam.)
+ * DESATIVADO. Um sistema que valida junto da AGT não pode ter nenhuma função que apague documentos emitidos
+ * (nem "só para testes"): é exatamente o que a validação verifica. Para corrigir um documento, anule-o com
+ * nota de crédito. Dados de teste limpam-se num projeto Supabase de TESTES, nunca no de produção.
+ * A função continua exportada só para as rotas e o ecrã antigos não rebentarem ao arrancar.
  */
 async function limparDocumentosDeTeste() {
-  if (PROGRAMA.certificado) {
-    throw new ErroValidacao('Este software já tem número de validação da AGT: os documentos emitidos não podem ser eliminados. Para corrigir um documento, anule-o com nota de crédito.')
-  }
-
-  const t = await sequelize.transaction()
-  const q = (sql, opcoes = {}) => sequelize.query(sql, { transaction: t, ...opcoes })
-  try {
-    const [{ n }] = await q('SELECT COUNT(*)::int AS n FROM faturas', { type: QueryTypes.SELECT })
-    if (n === 0) {
-      await t.rollback()
-      return { documentos: 0 }
-    }
-
-    await q("SET LOCAL app.limpeza_teste = 'sim'")
-
-    // 1. o stock volta ao que era antes das vendas (soma dos movimentos ligados a documentos, com sinal trocado)
-    await q(`UPDATE produtos p SET stock_atual = p.stock_atual - m.liquido
-             FROM (SELECT produto_id, SUM(quantidade)::int AS liquido
-                   FROM movimentos_stock WHERE fatura_id IS NOT NULL GROUP BY produto_id) m
-             WHERE p.id = m.produto_id`)
-    await q('DELETE FROM movimentos_stock WHERE fatura_id IS NOT NULL')
-
-    // 2. documentos (as notas de crédito primeiro, porque apontam para os originais)
-    await q('DELETE FROM pagamentos')
-    await q('DELETE FROM fatura_itens')
-    await q("DELETE FROM faturas WHERE tipo = 'NC'")
-    await q('DELETE FROM faturas')
-
-    // 3. numeração e registos de atividade dos documentos recomeçam do zero
-    await q('UPDATE series_documentos SET ultimo_numero = 0')
-    await q("DELETE FROM auditoria WHERE tabela = 'faturas'")
-    for (const tabela of ['faturas', 'fatura_itens', 'pagamentos']) {
-      await q(`SELECT setval(pg_get_serial_sequence('${tabela}', 'id'), 1, false)`)
-    }
-
-    await t.commit()
-    return { documentos: n }
-  } catch (erro) {
-    await t.rollback()
-    if (/não podem ser (apagad|alterad)/i.test(erro.message)) {
-      throw new ErroValidacao('A base de dados bloqueou a eliminação. Execute novamente o ficheiro postgres_sequencias_e_triggers.sql (versão atualizada) e tente outra vez.')
-    }
-    throw erro
-  }
+  throw new ErroValidacao('Eliminar documentos emitidos não é permitido. Para corrigir um documento, anule-o com nota de crédito.')
 }
 
 // ---------------------------------------------------------------- fecho do dia

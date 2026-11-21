@@ -115,7 +115,7 @@ function Folha({ doc, formato, troco, segundaVia }) {
       {doc.observacoes && !doc.origem && <div style={{ marginTop: 10 }}>{doc.observacoes}</div>}
 
       <div className={estilo.docRodape}>
-        <div>Controlo: {doc.hash ? doc.hash.slice(0, 4) : '—'} · Processado por {doc.programa.nome} v{doc.programa.versao}</div>
+        <div>Controlo: {(doc.assinatura || doc.hash || '').slice(0, 4) || '—'} · Processado por {doc.programa.nome} v{doc.programa.versao}</div>
         {certificado
           ? <div>Software validado pela AGT n.º {certificado}</div>
           : <div className={estilo.docAviso}>Documento sem valor fiscal: software ainda não validado pela AGT.</div>}

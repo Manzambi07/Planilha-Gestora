@@ -23,6 +23,15 @@ const Fatura = sequelize.define('Fatura', {
   },
   motivo_anulacao: { type: DataTypes.STRING(255) },
   hash_documento: { type: DataTypes.CHAR(64) },
+  // segurança fiscal (migração A): ligação ao documento anterior, assinatura RSA,
+  // cópia dos dados do emitente e do cliente na emissão, e programa que produziu o documento
+  hash_anterior: { type: DataTypes.TEXT },
+  assinatura: { type: DataTypes.TEXT },
+  chave_versao: { type: DataTypes.SMALLINT },
+  emitente_snapshot: { type: DataTypes.JSONB },
+  cliente_snapshot: { type: DataTypes.JSONB },
+  software_cert: { type: DataTypes.TEXT },
+  software_versao: { type: DataTypes.TEXT },
   observacoes: { type: DataTypes.TEXT },
 }, {
   tableName: 'faturas',
@@ -31,7 +40,7 @@ const Fatura = sequelize.define('Fatura', {
   updatedAt: 'atualizado_em',
   indexes: [{ unique: true, fields: ['serie_id', 'numero'] }],
   hooks: {
-    // Segunda barreira (a primeira é o trigger no MySQL)
+    // Segunda barreira (a primeira é o trigger no PostgreSQL)
     beforeDestroy: () => {
       throw new Error('Faturas não podem ser apagadas. Use anulação ou nota de crédito.');
     },
